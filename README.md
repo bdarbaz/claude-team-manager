@@ -91,11 +91,13 @@ claude -p --agent team-manager "tüm takımları kapat ve temizle"
 tmux new -s myproject
 ```
 
-### 2. Claude'u tmux Modunda Başlat
+### 2. Claude'u Team Lead Olarak Başlat
 
 ```bash
-claude --teammate-mode tmux
+claude --team-mode tmux --dangerously-skip-permissions
 ```
+
+> **Dikkat:** `--team-mode tmux` flag'i **zorunludur** - bu olmadan Claude agent spawn edemez ve teammate yönetemez. `--dangerously-skip-permissions` opsiyoneldir ama multi-agent çalışmada her işlem için onay vermemek için önerilir.
 
 ### 3. Team Oluştur (doğal dille)
 
@@ -113,6 +115,16 @@ Create an agent team with 3 teammates:
 claude --agent team-manager
 ```
 
+## Kritik Flag'ler
+
+| Flag | Kim kullanır | Zorunlu mu | Açıklama |
+|------|-------------|------------|----------|
+| `--team-mode tmux` | **Team Lead** | **Evet** | Lead'in teammate spawn edebilmesi ve yönetebilmesi için zorunlu |
+| `--teammate-mode tmux` | **Teammate'ler** | **Evet** | Teammate olarak başlatılan agent'lar için zorunlu (lead otomatik ekler) |
+| `--dangerously-skip-permissions` | Lead veya Teammate | Hayır | Her işlem için onay sormasını engeller, multi-agent'ta önerilir |
+
+> **Lead = `--team-mode tmux`**, **Teammate = `--teammate-mode tmux`**. Karıştırmayın!
+
 ## tmux Kısayolları
 
 Agent manager olmadan da tmux'ta gezinmek için:
@@ -124,6 +136,19 @@ Agent manager olmadan da tmux'ta gezinmek için:
 | `Ctrl+B` sonra `q` + numara | Numaralı pane'e atla |
 | `Ctrl+B` sonra `z` | Pane'i zoom/unzoom |
 | Mouse tıklama | Doğrudan pane'e geç (mouse on ise) |
+
+## tmux Mouse & Clipboard
+
+tmux mouse mode açıkken sağ tık tmux menüsü açar. Kopyala/yapıştır için:
+
+| İşlem | Kısayol |
+|-------|---------|
+| Metin seç | **Shift + Sol Tık sürükle** |
+| Kopyala | **Shift + Ctrl+C** |
+| Yapıştır | **Shift + Ctrl+V** veya **Shift + Sağ Tık** |
+| tmux buffer'dan yapıştır | `Ctrl+B` sonra `]` |
+
+> **Shift tuşu** tmux mouse mode'u bypass eder ve terminal'in kendi seçim/kopyalama özelliğini kullanmanızı sağlar.
 
 ## Dosya Yapısı
 
