@@ -1,195 +1,146 @@
 # Claude Team Manager
 
-Claude Code agent team'lerini tmux üzerinden yöneten custom agent. Ayrı bir terminalden agent team'lerinizi izleyin, mesaj gönderin, yeniden başlatın ve temizleyin.
+Claude Code agent team'lerini yoneten ve herhangi bir fikri multi-agent calisabilir prompt'a donusturen sistem.
 
-## Nedir?
+## Ne Yapar?
 
-Claude Code'un [Agent Teams](https://code.claude.com/docs/en/agent-teams) özelliği birden fazla Claude oturumunu tmux split pane'lerinde çalıştırır. Bu agent, **ikinci bir terminalden** tüm team'i yönetmenizi sağlar.
-
-```
-┌─────────────────────────────────────────────────┐
-│ Terminal 1: tmux (agent team çalışıyor)         │
-│ ┌──────────────┬──────────────┬───────────────┐ │
-│ │ Lead         │ Frontend     │ Backend       │ │
-│ │ (claude)     │ (claude)     │ (claude)      │ │
-│ │              │              │               │ │
-│ └──────────────┴──────────────┴───────────────┘ │
-├─────────────────────────────────────────────────┤
-│ Terminal 2: claude --agent team-manager          │
-│ > "durum göster"                                │
-│ > "frontend agent'a 'login sayfasını bitir' de" │
-│ > "backend takılmış, yeniden başlat"            │
-│ > "tüm takımı kapat"                            │
-└─────────────────────────────────────────────────┘
-```
+1. **Prompt Architect** - Herhangi bir fikri/prompt'u multi-agent ready hale getirir (agent sayisi, roller, phase'ler, MCP routing)
+2. **Ortam Hazirlik** - Eksik plugin, MCP, skill tespiti ve kurulumu
+3. **Monitor & Control** - Calisan agent team'leri izler, mesaj gonderir, takilanlari yeniden baslatir
 
 ## Gereksinimler
 
-- **Claude Code** v2.1.32+ (`npm install -g @anthropic-ai/claude-code`)
-- **tmux** (split-pane modu için) (`sudo apt install tmux` veya `brew install tmux`)
+- **Claude Code** v2.1.32+
+- **tmux** (`sudo apt install tmux` veya `brew install tmux`)
+- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` settings.json'da
 
 ## Kurulum
 
 ```bash
-git clone https://github.com/KULLANICI_ADI/claude-team-manager.git
+git clone https://github.com/bdarbaz/claude-team-manager.git
 cd claude-team-manager
 chmod +x install.sh
 ./install.sh
 ```
 
-Installer otomatik olarak:
-1. Claude Code ve tmux'un kurulu olduğunu kontrol eder
-2. `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` feature flag'ini aktifleştirir
-3. Agent dosyasını `~/.claude/agents/` dizinine kopyalar
-4. tmux mouse desteğini açar
-
-### Manuel Kurulum
-
-Agent dosyasını direkt kopyalayın:
-
+Veya manuel:
 ```bash
 cp agents/team-manager.md ~/.claude/agents/team-manager.md
 ```
 
-## Kullanım
+## Kullanim
 
-### Interaktif Mod (Önerilen)
+### Yol 1: Team Manager ile (onerilen)
+
+Ikinci bir terminalden team manager'i baslat:
 
 ```bash
 claude --agent team-manager
 ```
 
-Sonra doğal dille yönetin:
-
-| Komut | Ne yapar |
-|-------|----------|
-| `durum göster` | Tüm tmux session ve pane'leri listeler |
-| `frontend agent'a mesaj gönder: login sayfasını bitir` | Belirli teammate'e talimat gönderir |
-| `pane 2'yi yeniden başlat` | Takılmış agent'ı graceful restart yapar |
-| `tüm takımı kapat` | Tüm teammate'leri kapatıp temizler |
-| `layout'u tiled yap` | Pane düzenini değiştirir |
-| `pane 3'e zoom yap` | Tek pane'i tam ekran yapar |
-
-### Tek Seferlik Komut
-
-```bash
-# Durum kontrolü
-claude -p --agent team-manager "tmux durumunu göster"
-
-# Teammate'e mesaj
-claude -p --agent team-manager "myproject session'ında pane 2'ye 'API endpoint'leri bitir' mesajı gönder"
-
-# Takım temizliği
-claude -p --agent team-manager "tüm takımları kapat ve temizle"
+Sonra dogal dille:
+```
+"Uber Eats benzeri bir yemek siparis uygulamasi yap. Next.js + Supabase."
 ```
 
-## Agent Team Nasıl Kurulur?
+Team manager otomatik olarak:
+- Ortami kontrol eder (plugin, MCP, skill)
+- Eksikleri kurar
+- Agent sayisini ve rollerini belirler
+- Phase'leri tasarlar
+- Prompt'u hazirlar ve lead'e gonderir
+- Calismayi izler
 
-### 1. tmux Session Başlat
+### Yol 2: Standalone (team manager olmadan)
 
+tmux baslat ve lead'e dogrudan prompt ver:
+
+```bash
+tmux new-session -s projem
+claude --dangerously-skip-permissions
+```
+
+Sonra `prompts/auto-team.md` dosyasindaki prompt template'ini kullan. Proje aciklamanizi ekleyip lead'e yapisitirin. Lead kendi basina:
+- Projeyi analiz eder
+- MCP'leri tespit eder
+- Agent sayisina karar verir
+- Team'i kurar ve calistirir
+
+Ornek:
+```
+Sen bir multi-agent orchestrator'sun. Sana verilen projeyi analiz edip,
+uygun sayida teammate ile paralel olarak gelistireceksin.
+
+PROJE: Portfolio web sitesi. Next.js, Tailwind, blog, contact form.
+
+[...prompt/auto-team.md'deki kurallari ekle...]
+```
+
+## Agent Team Nasil Kurulur?
+
+### 1. tmux Session Baslat
 ```bash
 tmux new -s myproject
 ```
 
-### 2. Claude'u Team Lead Olarak Başlat
-
+### 2. Claude'u Lead Olarak Baslat
 ```bash
-claude --team-mode tmux --dangerously-skip-permissions
+claude --dangerously-skip-permissions
 ```
 
-> **Dikkat:** `--team-mode tmux` flag'i **zorunludur** - bu olmadan Claude agent spawn edemez ve teammate yönetemez. `--dangerously-skip-permissions` opsiyoneldir ama multi-agent çalışmada her işlem için onay vermemek için önerilir.
+> `--team-mode` veya `--teammate-mode` flag'leri YOKTUR. Lead normal baslatilir, built-in agent team mekanizmasi `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` env var ile aktif olur.
 
-### 3. Team Oluştur (doğal dille)
+### 3. Team Olustur (dogal dille)
 
 ```
-Create an agent team with 3 teammates:
+Bir agent team olustur, split pane modunda calistir.
+3 teammate:
 - frontend: React component development
 - backend: API and server logic
 - database: Schema design and migrations
+
+Isi biten teammate'in pane'ini hemen kapat.
+Superpowers skilllerini kullan.
 ```
 
-### 4. Yönetim İçin İkinci Terminal Aç
+### 4. Yonetim Icin Ikinci Terminal Ac
 
 ```bash
-# Yeni terminal penceresi aç (tmux dışında)
 claude --agent team-manager
 ```
 
-## Kritik Flag'ler
+## Kritik Kurallar
 
-| Flag | Kim kullanır | Zorunlu mu | Açıklama |
-|------|-------------|------------|----------|
-| `--team-mode tmux` | **Team Lead** | **Evet** | Lead'in teammate spawn edebilmesi ve yönetebilmesi için zorunlu |
-| `--teammate-mode tmux` | **Teammate'ler** | **Evet** | Teammate olarak başlatılan agent'lar için zorunlu (lead otomatik ekler) |
-| `--dangerously-skip-permissions` | Lead veya Teammate | Hayır | Her işlem için onay sormasını engeller, multi-agent'ta önerilir |
+| Kural | Aciklama |
+|-------|----------|
+| Pane kapatma | "Isi biten teammate'in pane'ini hemen kapat" MUTLAKA prompt'a eklenmelidir |
+| Superpowers | "Superpowers skilllerini kullan" - brainstorming/planning icin |
+| Split pane | Teammate'ler otomatik split pane olarak acar, manuel tmux gerek yok |
+| Dosya cakismasi | Her teammate FARKLI dosyalar uzerinde calismalı |
+| Phase sırasi | Foundation -> Features -> Integration |
 
-> **Lead = `--team-mode tmux`**, **Teammate = `--teammate-mode tmux`**. Karıştırmayın!
+## tmux Kisayollari
 
-## tmux Kısayolları
-
-Agent manager olmadan da tmux'ta gezinmek için:
-
-| Kısayol | İşlev |
+| Kisayol | Islev |
 |---------|-------|
-| `Ctrl+B` sonra `o` | Sonraki pane'e geç |
-| `Ctrl+B` sonra `↑↓←→` | Ok tuşlarıyla pane seç |
-| `Ctrl+B` sonra `q` + numara | Numaralı pane'e atla |
-| `Ctrl+B` sonra `z` | Pane'i zoom/unzoom |
-| Mouse tıklama | Doğrudan pane'e geç (mouse on ise) |
+| `Shift+Down` | Teammate'ler arasi gecis (Claude Code built-in) |
+| `Ctrl+B` `z` | Pane zoom/unzoom |
+| `Shift+Sol Tik` | Metin sec (mouse mode bypass) |
+| `Shift+Ctrl+C` | Kopyala |
+| `Shift+Ctrl+V` | Yapistir |
 
-## tmux Mouse & Clipboard
-
-tmux mouse mode açıkken sağ tık tmux menüsü açar. Kopyala/yapıştır için:
-
-| İşlem | Kısayol |
-|-------|---------|
-| Metin seç | **Shift + Sol Tık sürükle** |
-| Kopyala | **Shift + Ctrl+C** |
-| Yapıştır | **Shift + Ctrl+V** veya **Shift + Sağ Tık** |
-| tmux buffer'dan yapıştır | `Ctrl+B` sonra `]` |
-
-> **Shift tuşu** tmux mouse mode'u bypass eder ve terminal'in kendi seçim/kopyalama özelliğini kullanmanızı sağlar.
-
-## Dosya Yapısı
+## Dosya Yapisi
 
 ```
 claude-team-manager/
 ├── agents/
-│   └── team-manager.md    # Agent tanım dosyası
-├── install.sh             # Otomatik kurulum scripti
-├── uninstall.sh           # Kaldırma scripti
+│   └── team-manager.md       # Agent tanim dosyasi (monitor + prompt architect)
+├── prompts/
+│   └── auto-team.md          # Standalone prompt template (team manager olmadan)
+├── install.sh
+├── uninstall.sh
 ├── LICENSE
 └── README.md
-```
-
-## Agent Nasıl Çalışır?
-
-Agent, tmux komutlarını kullanarak:
-
-- `tmux ls` / `tmux list-panes` ile session ve pane'leri keşfeder
-- `tmux capture-pane` ile her pane'in çıktısını okur
-- `tmux send-keys` ile teammate'lere mesaj/komut gönderir
-- `~/.claude/teams/` ve `~/.claude/tasks/` dosyalarını okuyarak team metadata'sına erişir
-- Graceful shutdown (Ctrl+C → /exit) → force kill sıralamasıyla güvenli kapatma yapar
-
-## Güvenlik Kuralları
-
-- Lead (Pane 0) asla onaysız kapatılmaz
-- Tüm kapatmalar önce graceful (Ctrl+C → /exit) denenir
-- Yıkıcı işlemlerden önce ve sonra durum gösterilir
-- Team config restart sırasında korunur
-
-## Kaldırma
-
-```bash
-chmod +x uninstall.sh
-./uninstall.sh
-```
-
-Veya manuel:
-
-```bash
-rm ~/.claude/agents/team-manager.md
 ```
 
 ## Lisans
