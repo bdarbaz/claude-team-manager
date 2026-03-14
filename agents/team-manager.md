@@ -25,6 +25,7 @@ You can list teams, check teammate status, send commands, restart stuck agents, 
 - Use Shift+Down to cycle between teammates
 - Status bar shows: `@main @teammate1 @teammate2 · shift + down to expand`
 - DO NOT manually manage tmux split-window, launcher scripts, etc. - the built-in system handles it
+- IMPORTANT: Lead does NOT auto-close finished teammates. Always include in prompt: "Isi biten teammate'in pane'ini hemen kapat"
 
 ### 2. Superpowers vs Subagent
 - Lead SHOULD use superpowers skills (brainstorming, planning, debugging) - good for planning
@@ -43,16 +44,26 @@ d) Manual tmux split-window + interactive claude + send-keys: Works but fragile,
 e) Manual tmux new-window: Creates separate tabs, user can't see all agents at once
 f) Launcher scripts with bash: Shell interprets backticks, $() in prompts causing errors
 
-### 4. The Correct Startup Sequence
+### 4. The Correct Startup Sequence & Prompt Template
 ```
 1. tmux new-session -s projectname
 2. claude --dangerously-skip-permissions
-3. Tell Claude: "Read PLAN.md. Create an agent team with split pane mode.
-   4 teammates: DB, Frontend, Backend, Seed. Each teammate does X."
+3. Tell Claude (include ALL of these points):
+
+   "Read PLAN.md. Create an agent team with split pane mode.
+   4 teammates: DB, Frontend, Backend, Seed.
+   Each teammate does X.
+   Isi biten teammate'in pane'ini hemen kapat.
+   Superpowers skilllerini kullan."
+
 4. Claude automatically creates team, tasks, spawns teammates
 5. Teammates appear as split panes
 6. Shift+Down to navigate between teammates
 ```
+
+CRITICAL: Always include "isi biten teammate'in pane'ini hemen kapat" in the
+initial prompt. Without this, finished teammates stay as idle panes cluttering
+the screen.
 
 ### 5. tmux Mouse & Clipboard
 - `set -g mouse on` enables mouse but breaks right-click paste
@@ -201,7 +212,12 @@ When asked for status, always run these in order:
 The CORRECT way to start an agent team:
 1. Create tmux session: `tmux new-session -s projectname`
 2. Start lead: `claude --dangerously-skip-permissions`
-3. Send natural language instruction to create team with teammates
+3. Send natural language instruction including:
+   - What plan file to read
+   - How many teammates and their roles
+   - "Split pane modunda calistir"
+   - "Isi biten teammate'in pane'ini hemen kapat" (CRITICAL - without this they stay idle)
+   - "Superpowers skilllerini kullan"
 4. Lead uses built-in TeamCreate/Agent tools automatically
 5. Teammates appear as split panes - NO manual tmux management needed
 6. Verify with `tmux list-panes` that teammates spawned
@@ -234,6 +250,7 @@ When orchestrating the lead agent:
 3. Always verify lead received and is acting on the message
 4. If lead is interrupted/stuck, send `C-c` then resend
 5. Tell lead to use built-in agent team mechanism, NOT manual tmux commands
+6. ALWAYS include "isi biten teammate'in pane'ini hemen kapat" in instructions
 
 </workflows>
 
@@ -263,9 +280,11 @@ When capturing pane content, show the last few meaningful lines, skip empty line
 - ALWAYS try graceful shutdown (Ctrl+C -> /exit) before force killing
 - ALWAYS show current state before and after destructive operations
 - When starting teams: tell lead to use BUILT-IN agent team mechanism (natural language)
+- ALWAYS include "isi biten teammate'in pane'ini hemen kapat" in initial prompt to lead
 - DO NOT tell lead to manually manage tmux (split-window, send-keys, launcher scripts)
 - DO NOT tell lead to use claude -p (print mode) for agents
 - When the user says "status" or "durum", run the Quick Status Report workflow
 - When sending long instructions, write to temp file first then cat into send-keys
 - ALWAYS verify teammates spawned by checking tmux list-panes and status bar
+- If finished teammates are still idle, tell lead to close them immediately
 </rules>
