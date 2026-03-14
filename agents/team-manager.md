@@ -28,65 +28,77 @@ You can list teams, check teammate status, send commands, restart stuck agents, 
 - `--teammate-mode tmux` does NOT exist either
 - Agent teams work via the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` env var in settings
 - Lead starts with just: `claude --dangerously-skip-permissions`
-- Agents are spawned as: `claude --dangerously-skip-permissions -p "PROMPT"`
+- Agents are spawned in interactive mode (NOT with -p flag)
 
-### 3. Split Panes vs Windows
+### 3. Interactive Mode vs Print Mode - NEVER USE -p FOR AGENTS
+- `claude -p "PROMPT"` runs in print mode - NO output visible in tmux pane, user sees blank screen
+- ALWAYS start agents in interactive mode: `claude --dangerously-skip-permissions`
+- Then send the prompt as first message via `tmux send-keys`
+- This way user can see agent activity in real-time in the split panes
+- The correct spawn sequence:
+  1. Split pane: `tmux split-window -t SESSION -v`
+  2. Start interactive claude: `tmux send-keys -t SESSION.N "claude --dangerously-skip-permissions" Enter`
+  3. Wait for claude to load: `sleep 5`
+  4. Send prompt: `tmux send-keys -t SESSION.N "$(cat /tmp/agent-N-prompt.md)" Enter`
+
+### 4. Split Panes vs Windows
 - ALWAYS use `tmux split-window` (split panes) NOT `tmux new-window` (separate tabs)
 - Split panes: all agents visible on one screen
 - Windows: each agent in a separate tab, user can't see all at once
 - After creating panes: `tmux select-layout -t SESSION tiled` to equalize
 
-### 4. Agent Spawning - The Correct Method
+### 5. Agent Spawning - The Correct Method
 ```bash
 # 1. Write prompt to file (avoids shell escaping issues)
 cat > /tmp/agent-N-prompt.md << 'AGENTEOF'
 Your agent prompt here. No backticks, no $(), no nested quotes.
 AGENTEOF
 
-# 2. Write launcher script
-cat > /tmp/launch-agent-N.sh << 'LAUNCHEOF'
-#!/bin/bash
-cd /path/to/project
-claude --dangerously-skip-permissions -p "$(cat /tmp/agent-N-prompt.md)"
-LAUNCHEOF
-chmod +x /tmp/launch-agent-N.sh
-
-# 3. Create split pane and launch
+# 2. Create split pane
 tmux split-window -t SESSION -v
-tmux send-keys -t SESSION.PANE_INDEX "bash /tmp/launch-agent-N.sh" Enter
 
-# 4. After all panes created, equalize layout
+# 3. Start interactive claude in the pane
+tmux send-keys -t SESSION.PANE_INDEX "claude --dangerously-skip-permissions" Enter
+
+# 4. Wait for claude to load
+sleep 5
+
+# 5. Send prompt as first message
+tmux send-keys -t SESSION.PANE_INDEX "$(cat /tmp/agent-N-prompt.md)" Enter
+
+# 6. After all panes created, equalize layout
 tmux select-layout -t SESSION tiled
 ```
 
-### 5. Shell Escaping Pitfalls
+### 6. Shell Escaping Pitfalls
 - NEVER put raw code in `claude -p "..."` directly - shell interprets backticks, $(), etc.
 - ALWAYS write prompts to files first, then cat them
 - Use HEREDOC with single-quoted delimiter: `<< 'EOF'` (prevents variable expansion)
 - Prompts should be plain text - no shell-unsafe characters
 
-### 6. Flag-Based Communication
+### 7. Flag-Based Communication
 - Create flag directory: `mkdir -p /tmp/PROJECT-flags`
 - Agents signal completion: `touch /tmp/PROJECT-flags/AGENT_NAME-done`
 - Orchestrator polls: `ls /tmp/PROJECT-flags/` to check progress
 - Phase gating: don't start Phase N+1 until all Phase N flags exist
 
-### 7. Common Failures
+### 8. Common Failures
 - Lead trying to use TeamCreate/TeamSpawn tools (don't exist in this version)
 - Lead opening windows instead of split panes
 - Lead using superpowers subagent instead of tmux split panes
 - Manager saying "superpowers KULLANMA" instead of "subagent KULLANMA" - disabling useful skills
+- Lead using `claude -p` (print mode) for agents - panes appear BLANK, user sees nothing
 - Prompt shell escaping causing `import: command not found` errors
 - Supabase free plan 2-project limit blocking DB agent
 - Agents dying silently in background - always verify with `ps aux | grep claude`
 
-### 8. Sending Messages to Lead
+### 9. Sending Messages to Lead
 - Write long messages to a file first, then `cat` into send-keys
 - Or use: `tmux send-keys -t SESSION.PANE "$(cat /tmp/message.md)" Enter`
 - Short messages can be sent directly
 - Always check lead state before sending (might be interrupted or in prompt)
 
-### 9. tmux Mouse & Clipboard
+### 10. tmux Mouse & Clipboard
 - `set -g mouse on` in tmux.conf enables mouse but breaks right-click paste
 - Shift+Left Click drag = select text (bypasses tmux)
 - Shift+Ctrl+C = copy, Shift+Ctrl+V = paste
@@ -180,9 +192,10 @@ tmux split-window -t SESSION -v  # vertical split
 # Equalize all panes after creating them
 tmux select-layout -t SESSION tiled
 
-# Start claude agent in the new pane
-# Method: write prompt to file, create launcher, run launcher
-tmux send-keys -t SESSION.PANE_INDEX "bash /tmp/launch-agent-N.sh" Enter
+# Start claude agent in INTERACTIVE mode (NOT -p mode!)
+tmux send-keys -t SESSION.PANE_INDEX "claude --dangerously-skip-permissions" Enter
+sleep 5
+tmux send-keys -t SESSION.PANE_INDEX "$(cat /tmp/agent-N-prompt.md)" Enter
 ```
 
 ## 5. Team Cleanup
@@ -275,15 +288,17 @@ When orchestrating the lead agent:
 5. Include explicit rules about split panes vs windows in instructions
 6. ALWAYS include: "Superpowers skilllerini kullan AMA Agent tool ile subagent dispatch ETME"
 7. NEVER say "superpowers KULLANMA" - this disables useful planning/brainstorming skills
+8. ALWAYS include: "claude -p KULLANMA, interactive modda baslat"
 
 ## Spawning Agents Correctly
 
 When telling lead to spawn agents, ensure these rules are in the instruction:
 1. Use `tmux split-window -t SESSION -v` (NOT `tmux new-window`)
-2. Write prompts to files with HEREDOC (no shell-unsafe chars)
-3. Create launcher scripts that `cat` the prompt file
-4. After all panes created: `tmux select-layout -t SESSION tiled`
-5. Verify agents started: `ps aux | grep claude`
+2. Start claude in INTERACTIVE mode: `claude --dangerously-skip-permissions` (NOT `claude -p`)
+3. Wait 5 seconds for claude to load, then send prompt via send-keys
+4. Write prompts to files with HEREDOC (no shell-unsafe chars)
+5. After all panes created: `tmux select-layout -t SESSION tiled`
+6. Verify agents started and VISIBLE: `tmux capture-pane` should show claude UI, not blank
 
 </workflows>
 
@@ -311,14 +326,16 @@ When capturing pane content, show the last few meaningful lines, skip empty line
 <rules>
 - NEVER kill Pane 0 (the lead) without explicit user confirmation
 - ALWAYS use split panes (tmux split-window), NEVER windows (tmux new-window) for agents
+- ALWAYS start agents in INTERACTIVE mode (claude --dangerously-skip-permissions), NEVER print mode (claude -p)
 - ALWAYS try graceful shutdown (Ctrl+C -> /exit) before force killing
 - ALWAYS show current state before and after destructive operations
 - When instructing lead: ALWAYS say "superpowers kullan AMA subagent dispatch etme" - NEVER say "superpowers kullanma"
+- When instructing lead: ALWAYS say "claude -p KULLANMA, interactive modda baslat"
 - When restarting teammates, preserve the team config - don't delete it
 - If a team config references panes that no longer exist, warn the user about stale config
 - Use `sleep` between send-keys commands to give processes time to respond
 - When the user says "status" or "durum", run the Quick Status Report workflow
 - When sending long instructions, write to temp file first then cat into send-keys
 - ALWAYS remind lead to use split panes not windows when spawning agents
-- ALWAYS verify agents are running after spawn with ps aux
+- ALWAYS verify agents are running AND VISIBLE after spawn with tmux capture-pane
 </rules>
